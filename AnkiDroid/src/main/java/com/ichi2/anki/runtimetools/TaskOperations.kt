@@ -21,6 +21,7 @@
 package com.ichi2.anki.runtimetools
 
 import android.os.AsyncTask
+import com.ichi2.async.CoroutineAsyncTask
 
 object TaskOperations {
     /**
@@ -33,5 +34,10 @@ object TaskOperations {
                 t.cancel(true)
             }
         }
+    }
+
+    @JvmStatic
+    fun stopCoroutineGracefully(t: CoroutineAsyncTask<*, *, *>?) {
+        t?.let { t.cancel(false) }
     }
 }

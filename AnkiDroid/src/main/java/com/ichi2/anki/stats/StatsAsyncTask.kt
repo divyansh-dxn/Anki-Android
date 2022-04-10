@@ -16,16 +16,17 @@
 package com.ichi2.anki.stats
 
 import android.view.View
+import com.ichi2.async.CoroutineAsyncTask
+import kotlinx.coroutines.CoroutineScope
 import timber.log.Timber
 
 /**
  * Async task which handles cancellation (#6192)
  */
-@Suppress("deprecation") // #7108: AsyncTask
-abstract class StatsAsyncTask<TResult> : android.os.AsyncTask<View?, Void?, TResult?>() {
-    override fun doInBackground(vararg views: View?): TResult? {
+abstract class StatsAsyncTask<TResult>(scope: CoroutineScope) : CoroutineAsyncTask<View?, Void?, TResult?>(scope, "StatsAsyncTask") {
+    override fun doInBackground(vararg params: View?): TResult? {
         return try {
-            doInBackgroundSafe(*views)
+            doInBackgroundSafe(*params)
         } catch (e: Exception) {
             if (this.isCancelled) {
                 Timber.w(e, "ignored exception in cancelled stats task")

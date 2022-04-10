@@ -27,6 +27,7 @@ import com.ichi2.libanki.stats.Stats.AxisType
 import com.ichi2.libanki.stats.Stats.ChartType
 import com.ichi2.themes.Themes.getColorFromAttr
 import com.wildplot.android.rendering.PlotSheet
+import kotlinx.coroutines.CoroutineScope
 import timber.log.Timber
 import java.io.UnsupportedEncodingException
 import java.lang.ref.WeakReference
@@ -44,20 +45,19 @@ class AnkiStatsTaskHandler private constructor(private val collectionData: Colle
     }
 
     @Suppress("deprecation") // #7108: AsyncTask
-    fun createChart(chartType: ChartType, vararg views: View?): CreateChartTask {
-        val createChartTask = CreateChartTask(chartType, collectionData, statType, mDeckId)
+    fun createChart(scope: CoroutineScope, chartType: ChartType, vararg views: View?): CreateChartTask {
+        val createChartTask = CreateChartTask(chartType, collectionData, statType, mDeckId, scope)
         createChartTask.execute(*views)
         return createChartTask
     }
 
-    @Suppress("deprecation") // #7108: AsyncTask
-    fun createStatisticsOverview(vararg views: View?): CreateStatisticsOverview {
-        val createChartTask = CreateStatisticsOverview(collectionData, statType, mDeckId)
+    fun createStatisticsOverview(scope: CoroutineScope, vararg views: View?): CreateStatisticsOverview {
+        val createChartTask = CreateStatisticsOverview(collectionData, statType, mDeckId, scope)
         createChartTask.execute(*views)
         return createChartTask
     }
 
-    class CreateChartTask(chartType: ChartType, collection: Collection, statType: AxisType, deckId: Long) : StatsAsyncTask<PlotSheet?>() {
+    class CreateChartTask(chartType: ChartType, collection: Collection, statType: AxisType, deckId: Long, coroutineScope: CoroutineScope) : StatsAsyncTask<PlotSheet?>(coroutineScope) {
         private var mImageView: WeakReference<ChartView>? = null
         private var mProgressBar: WeakReference<ProgressBar>? = null
         private val mCollectionData: WeakReference<Collection>
@@ -90,15 +90,15 @@ class AnkiStatsTaskHandler private constructor(private val collectionData: Colle
             }
         }
 
-        override fun onCancelled() {
+        override fun onCancelled(result: PlotSheet?) {
             mIsRunning = false
         }
 
-        override fun onPostExecute(plotSheet: PlotSheet?) {
+        override fun onPostExecute(result: PlotSheet?) {
             val imageView = mImageView!!.get()
             val progressBar = mProgressBar!!.get()
-            if (plotSheet != null && mIsRunning && imageView != null && progressBar != null) {
-                imageView.setData(plotSheet)
+            if (result != null && mIsRunning && imageView != null && progressBar != null) {
+                imageView.setData(result)
                 progressBar.visibility = View.GONE
                 imageView.visibility = View.VISIBLE
                 imageView.invalidate()
@@ -114,7 +114,7 @@ class AnkiStatsTaskHandler private constructor(private val collectionData: Colle
         }
     }
 
-    class CreateStatisticsOverview(collection: Collection, statType: AxisType, deckId: Long) : StatsAsyncTask<String?>() {
+    class CreateStatisticsOverview(collection: Collection, statType: AxisType, deckId: Long, coroutineScope: CoroutineScope) : StatsAsyncTask<String?>(coroutineScope) {
         private var mWebView: WeakReference<WebView>? = null
         private var mProgressBar: WeakReference<ProgressBar>? = null
         private val mCollectionData: WeakReference<Collection>
@@ -143,16 +143,16 @@ class AnkiStatsTaskHandler private constructor(private val collectionData: Colle
             }
         }
 
-        override fun onCancelled() {
+        override fun onCancelled(result: String?) {
             mIsRunning = false
         }
 
-        override fun onPostExecute(html: String?) {
+        override fun onPostExecute(result: String?) {
             val webView = mWebView!!.get()
             val progressBar = mProgressBar!!.get()
-            if (html != null && mIsRunning && webView != null && progressBar != null) {
+            if (result != null && mIsRunning && webView != null && progressBar != null) {
                 try {
-                    webView.loadData(URLEncoder.encode(html, "UTF-8").replace("\\+".toRegex(), " "), "text/html; charset=utf-8", "utf-8")
+                    webView.loadData(URLEncoder.encode(result, "UTF-8").replace("\\+".toRegex(), " "), "text/html; charset=utf-8", "utf-8")
                 } catch (e: UnsupportedEncodingException) {
                     Timber.w(e)
                 }
@@ -230,6 +230,7 @@ class AnkiStatsTaskHandler private constructor(private val collectionData: Colle
         var instance: AnkiStatsTaskHandler? = null
             private set
         private val sLock: Lock = ReentrantLock()
+
         @JvmStatic
         @Synchronized
         fun getInstance(collection: Collection): AnkiStatsTaskHandler? {

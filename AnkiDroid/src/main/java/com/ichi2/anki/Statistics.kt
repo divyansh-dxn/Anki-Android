@@ -14,13 +14,11 @@
  * You should have received a copy of the GNU General Public License along with         *
  * this program.  If not, see <http://www.gnu.org/licenses/>.                           *
  ****************************************************************************************/
-@file:Suppress("DEPRECATION") // #7108: AsyncTask deprecation
 
 package com.ichi2.anki
 
 import android.content.Intent
 import android.graphics.Color
-import android.os.AsyncTask
 import android.os.Bundle
 import android.view.*
 import android.view.ViewTreeObserver.OnGlobalLayoutListener
@@ -30,6 +28,7 @@ import androidx.annotation.CheckResult
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView.AdapterDataObserver
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
@@ -38,11 +37,12 @@ import com.google.android.material.tabs.TabLayoutMediator
 import com.ichi2.anim.ActivityTransitionAnimation
 import com.ichi2.anki.dialogs.DeckSelectionDialog.DeckSelectionListener
 import com.ichi2.anki.dialogs.DeckSelectionDialog.SelectableDeck
-import com.ichi2.anki.runtimetools.TaskOperations.stopTaskGracefully
+import com.ichi2.anki.runtimetools.TaskOperations.stopCoroutineGracefully
 import com.ichi2.anki.stats.AnkiStatsTaskHandler
 import com.ichi2.anki.stats.AnkiStatsTaskHandler.Companion.getInstance
 import com.ichi2.anki.stats.ChartView
 import com.ichi2.anki.widgets.DeckDropDownAdapter.SubtitleListener
+import com.ichi2.async.CoroutineAsyncTask
 import com.ichi2.libanki.Collection
 import com.ichi2.libanki.Decks
 import com.ichi2.libanki.stats.Stats
@@ -58,6 +58,7 @@ class Statistics : NavigationDrawerActivity(), DeckSelectionListener, SubtitleLi
         private set
     var slidingTabLayout: TabLayout? = null
         private set
+
     @KotlinCleanup("maybe lateinit after AnkiStatsTaskHandler.getInstance() kotlin cleanup")
     var taskHandler: AnkiStatsTaskHandler? = null
         private set
@@ -227,10 +228,10 @@ class Statistics : NavigationDrawerActivity(), DeckSelectionListener, SubtitleLi
         protected var deckId: Long = 0
 
         // #7108: AsyncTask
-        protected var statisticsTask: AsyncTask<*, *, *>? = null
+        protected var statisticsTask: CoroutineAsyncTask<*, *, *>? = null
 
         // #7108: AsyncTask
-        protected var statisticsOverviewTask: AsyncTask<*, *, *>? = null
+        protected var statisticsOverviewTask: CoroutineAsyncTask<*, *, *>? = null
         private var mActivityPager: ViewPager2? = null
         private var mSlidingTabLayout: TabLayout? = null
         private var mTabLayoutMediator: TabLayoutMediator? = null
@@ -256,11 +257,12 @@ class Statistics : NavigationDrawerActivity(), DeckSelectionListener, SubtitleLi
 
         protected fun cancelTasks() {
             Timber.w("canceling tasks")
-            stopTaskGracefully(statisticsTask)
-            stopTaskGracefully(statisticsOverviewTask)
+            stopCoroutineGracefully(statisticsTask)
+            stopCoroutineGracefully(statisticsOverviewTask)
         }
 
         @KotlinCleanup("simplify return")
+        @Suppress("deprecation") // for String.toUpperCase
         private fun getTabTitle(position: Int): String {
             val l = Locale.getDefault()
             when (position) {
@@ -400,28 +402,28 @@ class Statistics : NavigationDrawerActivity(), DeckSelectionListener, SubtitleLi
             val taskHandler = statisticsActivity.taskHandler
             when (mSectionNumber) {
                 FORECAST_TAB_POSITION -> statisticsTask = taskHandler!!.createChart(
-                    Stats.ChartType.FORECAST, mChart, mProgressBar
+                    lifecycleScope, Stats.ChartType.FORECAST, mChart, mProgressBar
                 )
                 REVIEW_COUNT_TAB_POSITION -> statisticsTask = taskHandler!!.createChart(
-                    Stats.ChartType.REVIEW_COUNT, mChart, mProgressBar
+                    lifecycleScope, Stats.ChartType.REVIEW_COUNT, mChart, mProgressBar
                 )
                 REVIEW_TIME_TAB_POSITION -> statisticsTask = taskHandler!!.createChart(
-                    Stats.ChartType.REVIEW_TIME, mChart, mProgressBar
+                    lifecycleScope, Stats.ChartType.REVIEW_TIME, mChart, mProgressBar
                 )
                 INTERVALS_TAB_POSITION -> statisticsTask = taskHandler!!.createChart(
-                    Stats.ChartType.INTERVALS, mChart, mProgressBar
+                    lifecycleScope, Stats.ChartType.INTERVALS, mChart, mProgressBar
                 )
                 HOURLY_BREAKDOWN_TAB_POSITION -> statisticsTask = taskHandler!!.createChart(
-                    Stats.ChartType.HOURLY_BREAKDOWN, mChart, mProgressBar
+                    lifecycleScope, Stats.ChartType.HOURLY_BREAKDOWN, mChart, mProgressBar
                 )
                 WEEKLY_BREAKDOWN_TAB_POSITION -> statisticsTask = taskHandler!!.createChart(
-                    Stats.ChartType.WEEKLY_BREAKDOWN, mChart, mProgressBar
+                    lifecycleScope, Stats.ChartType.WEEKLY_BREAKDOWN, mChart, mProgressBar
                 )
                 ANSWER_BUTTONS_TAB_POSITION -> statisticsTask = taskHandler!!.createChart(
-                    Stats.ChartType.ANSWER_BUTTONS, mChart, mProgressBar
+                    lifecycleScope, Stats.ChartType.ANSWER_BUTTONS, mChart, mProgressBar
                 )
                 CARDS_TYPES_TAB_POSITION -> statisticsTask = taskHandler!!.createChart(
-                    Stats.ChartType.CARDS_TYPES, mChart, mProgressBar
+                    lifecycleScope, Stats.ChartType.CARDS_TYPES, mChart, mProgressBar
                 )
             }
         }
@@ -508,7 +510,7 @@ class Statistics : NavigationDrawerActivity(), DeckSelectionListener, SubtitleLi
 
         private fun createStatisticOverview() {
             val handler = (requireActivity() as Statistics).taskHandler
-            statisticsOverviewTask = handler!!.createStatisticsOverview(mWebView, mProgressBar)
+            statisticsOverviewTask = handler!!.createStatisticsOverview(lifecycleScope, mWebView, mProgressBar)
         }
 
         override fun checkAndUpdate() {
